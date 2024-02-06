@@ -1,4 +1,4 @@
-use kasa_port::{validate_ip, kasa_protocol};
+use rust_kasa::{validate_ip, kasa_protocol};
 use clap::Parser;
 use std::net::TcpStream;
 use std::string::String;
