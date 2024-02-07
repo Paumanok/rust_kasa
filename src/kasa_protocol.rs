@@ -41,16 +41,33 @@ pub struct SysInfo {
     pub updating:u32
 }
 
+#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
+pub struct Realtime {
+    pub current_ma: u32,
+    pub err_code: u32,
+    pub power_mw: u32,
+    pub slot_id: u32,
+    pub total_wh: u32,
+    pub voltage_mv: u32,
+}
+
 
 #[derive(Serialize, Deserialize)]
 pub struct System {
-    pub get_sysinfo: SysInfo,
+    pub get_sysinfo: Option<SysInfo>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Emeter {
+    pub get_realtime: Option<Realtime>,
 }
 
 
 #[derive(Serialize, Deserialize)]
 pub struct KasaResp {
-    pub system: System,
+    pub system: Option<System>,
+    pub emeter: Option<Emeter>,
 }
 
 // https://github.com/softScheck/tplink-smartplug/blob/master/tplink_smartplug.py#L70
@@ -93,9 +110,10 @@ pub fn deserialize(input: &str) -> KasaResp {
     return s
 }
 
+
 pub fn read_kasa_resp( stream: &mut TcpStream) -> Vec<u8> {
     let mut len = [0u8;4];
-    let _ = stream.read_exact(&mut len);
+    let _ = stream.read_exact(&mut len); //TODO: add a timeout here and return an option or result
     let len: usize = u32::from_be_bytes(len).try_into().unwrap();
     println!("resp len: {}", len);
     
@@ -117,18 +135,66 @@ pub fn send_kasa_cmd( stream: &mut TcpStream,cmd: &str) {
 }
 
 
-pub fn get_sys_info(stream: &mut TcpStream) -> SysInfo {
+pub fn get_sys_info(stream: &mut TcpStream) -> Option<SysInfo> {
+    println!("in sys info");
     let cmd = r#"{"system":{"get_sysinfo":null}}"#;
     send_kasa_cmd(stream, &cmd);
     let resp = read_kasa_resp(stream);
     let resp: KasaResp = deserialize( &decrypt(&resp));
-
-    return resp.system.get_sysinfo
+    return resp.system?.get_sysinfo;
 }
 
-pub fn get_children(stream: &mut TcpStream) -> Vec<KasaChildren> {
-    let c : Vec<KasaChildren> =  get_sys_info(stream).children;
-    return c
+
+pub fn get_all_realtime(stream: &mut TcpStream) -> Option<Vec<Realtime>> {
+    let c = get_children(stream)?;
+
+    let ids:Vec<String> = c.into_iter().map(|x| x.id).collect();
+    let mut rts: Vec<Realtime> = vec![];
+
+    for id in ids {
+       let resp: KasaResp = send_and_read( stream, 
+            &json!({
+                "context" : {
+                    "child_ids" : [ id ]
+            }, 
+            "emeter": {
+                "get_realtime":null
+            },
+
+            }).to_string()
+        );
+
+        rts.push(resp.emeter?.get_realtime?)
+
+    }
+
+    return Some(rts);
+
+    
+}
+
+fn send_and_read(stream: &mut TcpStream, cmd: &str) -> KasaResp {
+    send_kasa_cmd(stream, &cmd);
+    let resp = read_kasa_resp(stream);
+    let resp: KasaResp = deserialize( &decrypt(&resp));
+    return resp
+}
+
+
+pub fn get_realtime(stream: &mut TcpStream) -> Option<Realtime> {
+    let cmd = r#"{"emeter":{"get_realtime":null}}"#;
+    send_kasa_cmd(stream, &cmd);
+    let resp = read_kasa_resp(stream);
+    let resp: KasaResp = deserialize( &decrypt(&resp));
+    //let resp: Realtime = resp.emeter.unwrap().get_realtime?;
+    return resp.emeter?.get_realtime
+}
+
+
+
+pub fn get_children(stream: &mut TcpStream) -> Option<Vec<KasaChildren>> {
+    let c : Vec<KasaChildren> =  get_sys_info(stream)?.children;
+    return Some(c);
 }
 
 pub fn toggle_relay_by_alias(_stream: &mut TcpStream, _alias: String) {
@@ -136,7 +202,7 @@ pub fn toggle_relay_by_alias(_stream: &mut TcpStream, _alias: String) {
 }
 
 pub fn toggle_relay_by_idx(stream: &mut TcpStream, idx: usize) {
-    let children = get_children(stream);
+    let children = get_children(stream).unwrap();
     if idx < children.len() {
         let child_id = &children[idx].id;
         let state = match children[idx].state {

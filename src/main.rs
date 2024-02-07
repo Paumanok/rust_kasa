@@ -35,13 +35,19 @@ fn main() -> std::io::Result<()>{
         _  => println!("other"),
     };
 
-    let s: kasa_protocol::SysInfo = kasa_protocol::get_sys_info(&mut stream);
+    let s: kasa_protocol::SysInfo = kasa_protocol::get_sys_info(&mut stream).unwrap();
 
-
+    
+    
     println!("{:?}", s.hwId);
     for child in s.children {
         println!("found child: {:?} Alias: {:?}, state: {:?}", child.id,  child.alias, child.state);   
     }
 
+    let e: Option<Vec<kasa_protocol::Realtime>> = kasa_protocol::get_all_realtime(&mut stream);
+    match e {
+        None=> println!("get realtime failed"),
+        Some(realtime) => println!("{:#?}", realtime),
+    }
     Ok(())
 }
