@@ -136,7 +136,7 @@ pub fn send_kasa_cmd( stream: &mut TcpStream,cmd: &str) {
 
 
 pub fn get_sys_info(stream: &mut TcpStream) -> Option<SysInfo> {
-    println!("in sys info");
+    //println!("in sys info");
     let cmd = r#"{"system":{"get_sysinfo":null}}"#;
     send_kasa_cmd(stream, &cmd);
     let resp = read_kasa_resp(stream);
@@ -148,6 +148,9 @@ pub fn get_sys_info(stream: &mut TcpStream) -> Option<SysInfo> {
 pub fn get_all_realtime(stream: &mut TcpStream) -> Option<Vec<Realtime>> {
     let c = get_children(stream)?;
 
+
+    //you'd think a field with a plural 'ids' in list brackets would accept a list
+    // you'd be wrong, so we're calling it multiple times, otherwise it only returns idx0
     let ids:Vec<String> = c.into_iter().map(|x| x.id).collect();
     let mut rts: Vec<Realtime> = vec![];
 
@@ -180,6 +183,23 @@ fn send_and_read(stream: &mut TcpStream, cmd: &str) -> KasaResp {
     return resp
 }
 
+pub fn get_realtime_by_id(stream: &mut TcpStream, id:&String) -> Option<Realtime> {
+
+    let resp: KasaResp = send_and_read( stream, 
+        &json!({
+            "context" : {
+                "child_ids" : [ id ]
+        }, 
+        "emeter": {
+            "get_realtime":null
+        },
+
+        }).to_string()
+    );
+
+    let rt = resp.emeter?.get_realtime?;
+    Some(rt)
+}
 
 pub fn get_realtime(stream: &mut TcpStream) -> Option<Realtime> {
     let cmd = r#"{"emeter":{"get_realtime":null}}"#;
@@ -211,8 +231,6 @@ pub fn toggle_relay_by_idx(stream: &mut TcpStream, idx: usize) {
         };
         let _ = set_relay_by_child_id(stream, &child_id, state);
     }
-
-
     return
 }
 

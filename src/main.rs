@@ -34,13 +34,18 @@ fn main() -> std::io::Result<()>{
         "toggle" => kasa_protocol::toggle_relay_by_idx(&mut stream, 0),
         _  => println!("other"),
     };
+    
+    let _j : kasa_protocol::SysInfo = kasa_protocol::get_sys_info(&mut stream).unwrap();
 
-    let s: kasa_protocol::SysInfo = kasa_protocol::get_sys_info(&mut stream).unwrap();
+    let s: Vec<kasa_protocol::KasaChildren> = kasa_protocol::get_children(&mut stream).unwrap();
+
+    let rt: kasa_protocol::Realtime = kasa_protocol::get_realtime_by_id(&mut stream, &s[0].id).unwrap();
+
+    println!("ma: {:?}", rt.current_ma);
 
     
     
-    println!("{:?}", s.hwId);
-    for child in s.children {
+    for child in s {
         println!("found child: {:?} Alias: {:?}, state: {:?}", child.id,  child.alias, child.state);   
     }
 
