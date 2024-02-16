@@ -43,6 +43,7 @@ pub struct SysInfo {
 
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct Realtime {
     pub current_ma: u32,
     pub err_code: u32,
@@ -115,12 +116,19 @@ pub fn read_kasa_resp( stream: &mut TcpStream) -> Vec<u8> {
     let mut len = [0u8;4];
     let _ = stream.read_exact(&mut len); //TODO: add a timeout here and return an option or result
     let len: usize = u32::from_be_bytes(len).try_into().unwrap();
-    println!("resp len: {}", len);
+    //println!("resp len: {}", len);
     
     let mut recv: Vec<u8> = vec![];
     let mut rx_bytes = [0u8;256];
     loop {
-        let bytes_read = stream.read(&mut rx_bytes).unwrap();
+        let bytes_read = match stream.read(&mut rx_bytes){ 
+            Ok(bytes) => bytes,
+            Err(err) => { 
+                println!("stream.read failed, err: {:}", err);
+                break;
+            }
+        };
+
         recv.extend_from_slice(&rx_bytes[..bytes_read]);
         if recv.len() >= len {
             break;
@@ -134,6 +142,13 @@ pub fn send_kasa_cmd( stream: &mut TcpStream,cmd: &str) {
     let _ = stream.write(&cmd);
 }
 
+
+fn send_and_read(stream: &mut TcpStream, cmd: &str) -> KasaResp {
+    send_kasa_cmd(stream, &cmd);
+    let resp = read_kasa_resp(stream);
+    let resp: KasaResp = deserialize( &decrypt(&resp));
+    return resp
+}
 
 pub fn get_sys_info(stream: &mut TcpStream) -> Option<SysInfo> {
     //println!("in sys info");
@@ -176,12 +191,6 @@ pub fn get_all_realtime(stream: &mut TcpStream) -> Option<Vec<Realtime>> {
     
 }
 
-fn send_and_read(stream: &mut TcpStream, cmd: &str) -> KasaResp {
-    send_kasa_cmd(stream, &cmd);
-    let resp = read_kasa_resp(stream);
-    let resp: KasaResp = deserialize( &decrypt(&resp));
-    return resp
-}
 
 pub fn get_realtime_by_id(stream: &mut TcpStream, id:&String) -> Option<Realtime> {
 
@@ -206,11 +215,19 @@ pub fn get_realtime(stream: &mut TcpStream) -> Option<Realtime> {
     send_kasa_cmd(stream, &cmd);
     let resp = read_kasa_resp(stream);
     let resp: KasaResp = deserialize( &decrypt(&resp));
+    let resp =  resp.emeter?.get_realtime;
     //let resp: Realtime = resp.emeter.unwrap().get_realtime?;
-    return resp.emeter?.get_realtime
+    return resp
 }
 
-
+pub fn get_realtime_by_idx(stream: &mut TcpStream, idx: usize) -> Option<Realtime> {
+    let children = get_children(stream).unwrap();
+    if idx > children.len() {
+        return None;
+    }
+    
+    return get_realtime_by_id(stream, &children[idx].id)
+}
 
 pub fn get_children(stream: &mut TcpStream) -> Option<Vec<KasaChildren>> {
     let c : Vec<KasaChildren> =  get_sys_info(stream)?.children;
