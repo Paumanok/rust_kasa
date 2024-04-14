@@ -43,7 +43,7 @@ pub struct SysInfo {
 
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Realtime {
     pub current_ma: u32,
     pub err_code: u32,
@@ -94,15 +94,12 @@ pub fn decrypt(input: &Vec<u8>) -> String {
     let mut key = 171;
     let mut result = String::new();
     
-    //let len: [u8;4] = input[..4].try_into().unwrap();
-    //let data = &input[4..];
-    
     for c in input {
         let a = key ^ *c;
         key = *c;
         result.push(a as char);
     }
-    //println!("len: {}, payload: {}", len, result);
+   
     return result;
 }
 pub fn deserialize(input: &str) -> KasaResp {
@@ -112,7 +109,7 @@ pub fn deserialize(input: &str) -> KasaResp {
 }
 
 
-pub fn read_kasa_resp( stream: &mut TcpStream) -> Vec<u8> {
+pub fn read_kasa_resp( stream: &mut TcpStream) -> Option<Vec<u8>> {
     let mut len = [0u8;4];
     let _ = stream.read_exact(&mut len); //TODO: add a timeout here and return an option or result
     let len: usize = u32::from_be_bytes(len).try_into().unwrap();
@@ -125,7 +122,7 @@ pub fn read_kasa_resp( stream: &mut TcpStream) -> Vec<u8> {
             Ok(bytes) => bytes,
             Err(err) => { 
                 println!("stream.read failed, err: {:}", err);
-                break;
+                return None
             }
         };
 
@@ -134,7 +131,7 @@ pub fn read_kasa_resp( stream: &mut TcpStream) -> Vec<u8> {
             break;
         }
     }
-    return recv
+    return Some(recv)
 }
 
 pub fn send_kasa_cmd( stream: &mut TcpStream,cmd: &str) {
@@ -143,27 +140,71 @@ pub fn send_kasa_cmd( stream: &mut TcpStream,cmd: &str) {
 }
 
 
-fn send_and_read(stream: &mut TcpStream, cmd: &str) -> KasaResp {
+fn send_and_read(stream: &mut TcpStream, cmd: &str) -> Option<KasaResp> {
     send_kasa_cmd(stream, &cmd);
-    let resp = read_kasa_resp(stream);
+    let resp = read_kasa_resp(stream)?;
     let resp: KasaResp = deserialize( &decrypt(&resp));
-    return resp
+    return Some(resp)
 }
 
 pub fn get_sys_info(stream: &mut TcpStream) -> Option<SysInfo> {
     //println!("in sys info");
     let cmd = r#"{"system":{"get_sysinfo":null}}"#;
     send_kasa_cmd(stream, &cmd);
-    let resp = read_kasa_resp(stream);
+    let resp = read_kasa_resp(stream)?;
     let resp: KasaResp = deserialize( &decrypt(&resp));
     return resp.system?.get_sysinfo;
 }
 
 
+//pub fn get_all_realtime_mt(stream: &mut TcpStream) -> Option<Vec<Realtime>> {
+//    let c = get_children(stream)?;
+//    //you'd think a field with a plural 'ids' in list brackets would accept a list
+//    // you'd be wrong, so we're calling it multiple times, otherwise it only returns idx0
+//    let ids:Vec<String> = c.into_iter().map(|x| x.id).collect();
+//    let mut rts: Arc<Mutex<Vec<Realtime>>> = Arc::new(Mutex::new(vec![]));
+//    let mut threads = vec![];
+//
+//
+//
+//    for id in ids {
+//        threads.push(thread::spawn( move || -> Option<()> {
+//
+//            let resp: KasaResp = send_and_read( stream, 
+//                 &json!({
+//                     "context" : {
+//                         "child_ids" : [ id ]
+//                 }, 
+//                 "emeter": {
+//                     "get_realtime":null
+//                 },
+//
+//                 }).to_string()
+//             )?;
+//           
+//
+//            match rts.lock() {
+//                Ok(rt) => { rt.push(resp.emeter?.get_realtime?);}
+//                _ => (),
+//            }
+//            Some(())
+//
+//        }));
+//
+//    }
+//    for thread in threads {
+//        thread.join();
+//    }
+//    
+//    let ret = Arc::into_inner(rts)?.into_inner().ok()?;
+//    return Some(ret);
+//
+//    
+//}
+
+
 pub fn get_all_realtime(stream: &mut TcpStream) -> Option<Vec<Realtime>> {
     let c = get_children(stream)?;
-
-
     //you'd think a field with a plural 'ids' in list brackets would accept a list
     // you'd be wrong, so we're calling it multiple times, otherwise it only returns idx0
     let ids:Vec<String> = c.into_iter().map(|x| x.id).collect();
@@ -180,7 +221,7 @@ pub fn get_all_realtime(stream: &mut TcpStream) -> Option<Vec<Realtime>> {
             },
 
             }).to_string()
-        );
+        )?;
 
         rts.push(resp.emeter?.get_realtime?)
 
@@ -204,7 +245,7 @@ pub fn get_realtime_by_id(stream: &mut TcpStream, id:&String) -> Option<Realtime
         },
 
         }).to_string()
-    );
+    )?;
 
     let rt = resp.emeter?.get_realtime?;
     Some(rt)
@@ -213,7 +254,7 @@ pub fn get_realtime_by_id(stream: &mut TcpStream, id:&String) -> Option<Realtime
 pub fn get_realtime(stream: &mut TcpStream) -> Option<Realtime> {
     let cmd = r#"{"emeter":{"get_realtime":null}}"#;
     send_kasa_cmd(stream, &cmd);
-    let resp = read_kasa_resp(stream);
+    let resp = read_kasa_resp(stream)?;
     let resp: KasaResp = deserialize( &decrypt(&resp));
     let resp =  resp.emeter?.get_realtime;
     //let resp: Realtime = resp.emeter.unwrap().get_realtime?;
@@ -221,7 +262,7 @@ pub fn get_realtime(stream: &mut TcpStream) -> Option<Realtime> {
 }
 
 pub fn get_realtime_by_idx(stream: &mut TcpStream, idx: usize) -> Option<Realtime> {
-    let children = get_children(stream).unwrap();
+    let children = get_children(stream)?;
     if idx > children.len() {
         return None;
     }
@@ -251,7 +292,7 @@ pub fn toggle_relay_by_idx(stream: &mut TcpStream, idx: usize) {
     return
 }
 
-pub fn set_relay_by_child_id(stream: &mut TcpStream, child_id: &str, state:u8) -> bool{
+pub fn set_relay_by_child_id(stream: &mut TcpStream, child_id: &str, state:u8) -> Option<bool>{
 
     let cmd:String = json!({
             "context" : {
@@ -268,7 +309,7 @@ pub fn set_relay_by_child_id(stream: &mut TcpStream, child_id: &str, state:u8) -
     send_kasa_cmd(stream, cmd.as_str());
     let resp: Value = serde_json::from_str(
         &decrypt(
-            &read_kasa_resp(stream)
+            &read_kasa_resp(stream)?
         )
     ).unwrap();
     
@@ -276,10 +317,10 @@ pub fn set_relay_by_child_id(stream: &mut TcpStream, child_id: &str, state:u8) -
 
     let err_resp = resp["system"]["set_relay_state"]["err_code"].as_i64().unwrap();
 
-    return match err_resp {
+    return Some(match err_resp {
         0 => false,
         _ => true,
-    };
+    })
 }
 
 
