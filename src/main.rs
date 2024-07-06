@@ -1,8 +1,8 @@
-use rust_kasa::{validate_ip, kasa_protocol};
+use anyhow::{anyhow, Result};
 use clap::Parser;
+use rust_kasa::{kasa_protocol, models, validate_ip};
 use std::net::TcpStream;
 use std::string::String;
-
 
 #[derive(Parser)]
 struct Cli {
@@ -11,13 +11,12 @@ struct Cli {
 
     #[arg(short = 'a', long = "action")]
     action: String,
-    
 }
 
-fn main() -> std::io::Result<()>{
+fn main() -> Result<()> {
     let args = Cli::parse();
     println!("Hello, world!");
-    
+
     println!("target_addr: {:?}", args.target_addr);
 
     if validate_ip(&args.target_addr) {
@@ -25,34 +24,32 @@ fn main() -> std::io::Result<()>{
     } else {
         println!("bad ip");
     }
-    
 
-    
-    let mut stream = TcpStream::connect(args.target_addr +":9999")?;
+    let mut stream = TcpStream::connect(args.target_addr + ":9999")?;
 
     match args.action.as_str() {
-        "toggle" => kasa_protocol::toggle_relay_by_idx(&mut stream, 0),
-        _  => println!("other"),
+        "toggle" => {
+            _ = kasa_protocol::toggle_relay_by_idx(&mut stream, 0)
+                .unwrap_or_else(|error| panic!("{error:?}"))
+        }
+        _ => println!("other"),
     };
-    
-    let _j : kasa_protocol::SysInfo = kasa_protocol::get_sys_info(&mut stream).unwrap();
 
-    let s: Vec<kasa_protocol::KasaChildren> = kasa_protocol::get_children(&mut stream).unwrap();
+    let _j: models::SysInfo = kasa_protocol::get_sys_info(&mut stream).unwrap();
 
-    let rt: kasa_protocol::Realtime = kasa_protocol::get_realtime_by_id(&mut stream, &s[0].id).unwrap();
+    let s: Vec<models::KasaChildren> = kasa_protocol::get_children(&mut stream).unwrap();
+
+    let rt: models::Realtime = kasa_protocol::get_realtime_by_id(&mut stream, &s[0].id).unwrap();
 
     println!("ma: {:?}", rt.current_ma);
 
-    
-    
     for child in s {
-        println!("found child: {:?} Alias: {:?}, state: {:?}", child.id,  child.alias, child.state);   
+        println!(
+            "found child: {:?} Alias: {:?}, state: {:?}",
+            child.id, child.alias, child.state
+        );
     }
 
-    let e: Option<Vec<kasa_protocol::Realtime>> = kasa_protocol::get_all_realtime(&mut stream);
-    match e {
-        None=> println!("get realtime failed"),
-        Some(realtime) => println!("{:#?}", realtime),
-    }
+    let _e: Vec<models::Realtime> = kasa_protocol::get_all_realtime(&mut stream)?;
     Ok(())
 }

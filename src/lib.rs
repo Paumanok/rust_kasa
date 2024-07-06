@@ -1,11 +1,7 @@
-
-
-
 pub mod kasa_protocol;
+pub mod models;
 
-
-pub fn validate_ip(ip: &String) -> bool{
-
+pub fn validate_ip(ip: &String) -> bool {
     let ip: Vec<&str> = ip.split(".").collect();
 
     if ip.len() != 4 {
