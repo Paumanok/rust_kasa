@@ -260,3 +260,31 @@ pub fn set_relay_by_child_id(stream: &mut TcpStream, child_id: &str, state: u8) 
         _ => true,
     });
 }
+
+pub fn set_outlet_alias(stream: &mut TcpStream, child_id: &str, alias: &str) -> Result<bool> {
+    let cmd: String = json!({
+        "context" : {
+            "child_ids": [ child_id ]
+        },
+        "system" : { 
+            "set_dev_alias":{ 
+                "alias": alias
+            }
+        }
+    })
+    .to_string();
+
+    send_kasa_cmd(stream, cmd.as_str());
+    let resp: Value = serde_json::from_str(&decrypt(&read_kasa_resp(stream).unwrap()))?;
+    
+    let err_resp = resp["system"]["set_dev_alias"]["err_code"]
+        .as_i64()
+        .unwrap();
+    println!("{err_resp}");
+
+    return Ok(match err_resp {
+        0 => false,
+        _ => true,
+    });
+
+}

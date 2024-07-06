@@ -43,6 +43,22 @@ fn main() -> Result<()> {
 
     println!("ma: {:?}", rt.current_ma);
 
+    for child in &s {
+        println!(
+            "found child: {:?} Alias: {:?}, state: {:?}",
+            child.id, child.alias, child.state
+        );
+    }
+    let amp = &s[2];
+    let alias_success = kasa_protocol::set_outlet_alias(&mut stream, &amp.id, "amp");
+
+    if let Ok(suc) = alias_success {
+        println!("{suc}")
+    }
+    
+    let s: Vec<models::KasaChildren> = kasa_protocol::get_children(&mut stream).unwrap();
+
+
     for child in s {
         println!(
             "found child: {:?} Alias: {:?}, state: {:?}",
