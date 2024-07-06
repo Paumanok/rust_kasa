@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::Parser;
 use rust_kasa::{kasa_protocol, models, validate_ip};
 use std::net::TcpStream;

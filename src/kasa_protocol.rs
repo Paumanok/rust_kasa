@@ -1,10 +1,9 @@
 use anyhow::{anyhow, Result};
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::io::prelude::*;
 use std::net::TcpStream;
 
-use crate::models::{Emeter, KasaChildren, KasaResp, NextAction, Realtime, SysInfo, System};
+use crate::models::{ KasaChildren, KasaResp, Realtime, SysInfo};
 
 // https://github.com/softScheck/tplink-smartplug/blob/master/tplink_smartplug.py#L70
 pub fn encrypt(input: &str) -> Vec<u8> {

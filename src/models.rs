@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 
 #[derive(Serialize, Deserialize)]
 pub struct NextAction {
