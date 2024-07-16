@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct NextAction {
     pub r#type: i32,
 }
 #[derive(Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct KasaChildren {
     pub id: String,
     pub state: u8,

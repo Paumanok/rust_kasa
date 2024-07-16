@@ -29,6 +29,9 @@ fn main() -> Result<()> {
             _ = kasa_protocol::toggle_relay_by_idx(&mut stream, 0)
                 .unwrap_or_else(|error| panic!("{error:?}"))
         }
+        "toggle2" => {
+            dev.toggle_relay_by_id(0)
+        }
         _ => println!("other"),
     };
 

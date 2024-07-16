@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 use std::net::UdpSocket;
-use crate::kasa_protocol::{encrypt, decrypt, deserialize, get_sys_info};
-use crate::models::{KasaResp, System};
+use crate::kasa_protocol::{self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx};
+use crate::models::{KasaChildren, KasaResp, System};
 use crate::validate_ip;
 use std::net::TcpStream;
 
@@ -21,6 +21,30 @@ impl Device {
         Device {
             ip_addr, 
             kasa_info,
+        }
+    }
+
+    pub fn get_children(&self) -> Option<Vec<KasaChildren>> {
+        let stream = TcpStream::connect(self.ip_addr.clone() + ":9999");
+        if let Ok(mut strm) = stream {
+
+            let  children = match kasa_protocol::get_children(&mut strm){
+                Ok(chldrn) => chldrn,
+                Err(_err) => vec![],
+            };
+            return Some(children);
+        }
+        //let children = self.kasa_info.system.unwrap().get_sysinfo.unwrap().children.clone();
+        println!("failed to get children");
+        return None
+    }
+    
+    //make this return the child after the change
+    pub fn toggle_relay_by_id(self, idx: usize)  {   
+        let  stream = TcpStream::connect(self.ip_addr.clone() + ":9999");
+        if let Ok(mut strm) = stream {
+             
+            let _ = toggle_relay_by_idx(&mut strm, idx);
         }
     }
     
