@@ -14,43 +14,14 @@ struct Cli {
     action: String,
 }
 
-fn determine_target(t_addr: String) -> Result<device::Device> {
-    if t_addr == "" {
-        //try discovery
-        if let Ok(kd) = device::discover() {
-            return Ok(kd);
-        } else {
-            return Err(anyhow!("Discovery failed and no target was provided"));
-        }
-    } else {
-        if validate_ip(&t_addr) {
-            println!("good ip");
-            let mut stream = TcpStream::connect(t_addr.clone() + ":9999")?;
-            return match kasa_protocol::get_sys_info(&mut stream) {
-                Ok(si) => Ok(device::Device {
-                    ip_addr: t_addr,
-                    kasa_info: models::KasaResp {
-                        system: Some(models::System{get_sysinfo: Some(si)}),
-                        emeter: None,
-                    },
-                }),
-                Err(si) => Err(si),
-            };
-        } else {
-            println!("bad ip");
-
-            return Err(anyhow!("Provided ip is invalid"));
-        }
-    }
-}
 
 fn main() -> Result<()> {
 
     let args = Cli::parse();
 
-    let device = determine_target(args.target_addr)?;
+    let dev = device::determine_target(args.target_addr)?;
 
-    let mut stream = TcpStream::connect(device.ip_addr )?;
+    let mut stream = TcpStream::connect(dev.ip_addr )?;
 
 
     match args.action.as_str() {

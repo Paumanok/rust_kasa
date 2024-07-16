@@ -1,8 +1,10 @@
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 use std::net::UdpSocket;
-use crate::kasa_protocol::{encrypt, decrypt, deserialize};
-use crate::models::KasaResp;
+use crate::kasa_protocol::{encrypt, decrypt, deserialize, get_sys_info};
+use crate::models::{KasaResp, System};
+use crate::validate_ip;
+use std::net::TcpStream;
 
 pub struct Device {
     pub ip_addr: String,
@@ -22,6 +24,36 @@ impl Device {
         }
     }
     
+}
+
+pub fn determine_target(t_addr: String) -> Result<Device> {
+    if t_addr == "" {
+        //try discovery
+        if let Ok(kd) = discover() {
+            return Ok(kd);
+        } else {
+            return Err(anyhow!("Discovery failed and no target was provided"));
+        }
+    } else {
+        if validate_ip(&t_addr) {
+            println!("good ip");
+            let mut stream = TcpStream::connect(t_addr.clone() + ":9999")?;
+            return match get_sys_info(&mut stream) {
+                Ok(si) => Ok(Device {
+                    ip_addr: t_addr,
+                    kasa_info: KasaResp {
+                        system: Some(System{get_sysinfo: Some(si)}),
+                        emeter: None,
+                    },
+                }),
+                Err(si) => Err(si),
+            };
+        } else {
+            println!("bad ip");
+
+            return Err(anyhow!("Provided ip is invalid"));
+        }
+    }
 }
 
 //this will only discover one
