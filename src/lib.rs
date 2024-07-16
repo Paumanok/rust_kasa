@@ -1,3 +1,4 @@
+pub mod device;
 pub mod kasa_protocol;
 pub mod models;
 

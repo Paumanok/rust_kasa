@@ -3,15 +3,19 @@ use serde_json::{json, Value};
 use std::io::prelude::*;
 use std::net::TcpStream;
 
-use crate::models::{ KasaChildren, KasaResp, Realtime, SysInfo};
+use crate::models::{KasaChildren, KasaResp, Realtime, SysInfo};
 
 // https://github.com/softScheck/tplink-smartplug/blob/master/tplink_smartplug.py#L70
-pub fn encrypt(input: &str) -> Vec<u8> {
+pub fn encrypt(input: &str, inc_len: bool) -> Vec<u8> {
     let mut key = 171; //just the initial key
     let mut result: Vec<u8> = vec![];
 
-    for octet in (input.len() as u32).to_be_bytes() {
-        result.push(octet);
+    //the same xor is used for both discovery and the protocol
+    //discovery lacks it, so we'll just switch here
+    if inc_len {
+        for octet in (input.len() as u32).to_be_bytes() {
+            result.push(octet);
+        }
     }
 
     for c in input.bytes() {
@@ -66,7 +70,7 @@ pub fn read_kasa_resp(stream: &mut TcpStream) -> Result<Vec<u8>> {
 }
 
 pub fn send_kasa_cmd(stream: &mut TcpStream, cmd: &str) {
-    let cmd = encrypt(cmd);
+    let cmd = encrypt(cmd, true);
     let _ = stream.write(&cmd);
 }
 
@@ -84,7 +88,7 @@ pub fn get_sys_info(stream: &mut TcpStream) -> Result<SysInfo> {
     let resp: KasaResp = deserialize(&decrypt(&resp));
     if let Some(system) = resp.system {
         if let Some(sys_info) = system.get_sysinfo {
-            return Ok(sys_info)
+            return Ok(sys_info);
         }
     }
     return Err(anyhow!("failed to get sys_info"));
@@ -185,10 +189,10 @@ pub fn get_realtime_by_id(stream: &mut TcpStream, id: &String) -> Result<Realtim
     //let rt = resp.emeter?.get_realtime?;
     if let Some(emeter) = resp.emeter {
         if let Some(rt) = emeter.get_realtime {
-            return Ok(rt)
+            return Ok(rt);
         }
     }
-    return Err(anyhow!("Realtime Response is None"))
+    return Err(anyhow!("Realtime Response is None"));
 }
 
 pub fn get_realtime(stream: &mut TcpStream) -> Result<Realtime> {
@@ -198,7 +202,7 @@ pub fn get_realtime(stream: &mut TcpStream) -> Result<Realtime> {
     let resp: KasaResp = deserialize(&decrypt(&resp));
     if let Some(emeter) = resp.emeter {
         if let Some(rt) = emeter.get_realtime {
-            return Ok(rt)
+            return Ok(rt);
         }
     }
     return Err(anyhow!("Realtime response is none"));
@@ -207,9 +211,12 @@ pub fn get_realtime(stream: &mut TcpStream) -> Result<Realtime> {
 pub fn get_realtime_by_idx(stream: &mut TcpStream, idx: usize) -> Result<Realtime> {
     let children = get_children(stream)?;
     if idx > children.len() {
-        return Err(anyhow!("invalid idx: {idx} where n children: {}", children.len()));
+        return Err(anyhow!(
+            "invalid idx: {idx} where n children: {}",
+            children.len()
+        ));
     }
-    get_realtime_by_id(stream, &children[idx].id) 
+    get_realtime_by_id(stream, &children[idx].id)
 }
 
 pub fn get_children(stream: &mut TcpStream) -> Result<Vec<KasaChildren>> {
@@ -266,8 +273,8 @@ pub fn set_outlet_alias(stream: &mut TcpStream, child_id: &str, alias: &str) -> 
         "context" : {
             "child_ids": [ child_id ]
         },
-        "system" : { 
-            "set_dev_alias":{ 
+        "system" : {
+            "set_dev_alias":{
                 "alias": alias
             }
         }
@@ -276,7 +283,7 @@ pub fn set_outlet_alias(stream: &mut TcpStream, child_id: &str, alias: &str) -> 
 
     send_kasa_cmd(stream, cmd.as_str());
     let resp: Value = serde_json::from_str(&decrypt(&read_kasa_resp(stream).unwrap()))?;
-    
+
     let err_resp = resp["system"]["set_dev_alias"]["err_code"]
         .as_i64()
         .unwrap();
@@ -286,5 +293,4 @@ pub fn set_outlet_alias(stream: &mut TcpStream, child_id: &str, alias: &str) -> 
         0 => false,
         _ => true,
     });
-
 }
