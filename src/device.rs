@@ -6,6 +6,7 @@ use crate::models::{KasaChildren, KasaResp, System};
 use crate::validate_ip;
 use std::net::TcpStream;
 
+#[derive(Clone)]
 pub struct Device {
     //TODO: ip_addr currently holds ip+port, need to actually parse that out
     pub ip_addr: String,
@@ -22,7 +23,7 @@ impl Device {
     }
 
     pub fn get_children(&self) -> Option<Vec<KasaChildren>> {
-        let stream = TcpStream::connect(self.ip_addr.clone() + ":9999");
+        let stream = TcpStream::connect(self.ip_addr.clone());
         if let Ok(mut strm) = stream {
 
             let  children = match kasa_protocol::get_children(&mut strm){
@@ -41,6 +42,7 @@ impl Device {
         let  stream = TcpStream::connect(self.ip_addr.clone());
         if let Ok(mut strm) = stream {
             let _ = toggle_relay_by_idx(&mut strm, idx);
+            println!("toggl'd");
         }
     }
     
@@ -98,7 +100,7 @@ pub fn discover() -> Result<Device> {
 
     let mut ip_addr : String = String::new();
 
-    if let Ok((n, addr)) = socket.recv_from(&mut buf) {
+    if let Ok((_n, addr)) = socket.recv_from(&mut buf) {
         //println!("{} bytes response from {:?}", n, addr);
         ip_addr = addr.to_string();
     }

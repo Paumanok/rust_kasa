@@ -15,7 +15,7 @@ pub struct KasaChildren {
     pub next_action: NextAction,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[allow(non_snake_case)] //kasa json mixes snake and camel and I don't have control of that
 pub struct SysInfo {
     pub alias: String,
@@ -49,17 +49,17 @@ pub struct Realtime {
     pub voltage_mv: u32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct System {
     pub get_sysinfo: Option<SysInfo>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Emeter {
     pub get_realtime: Option<Realtime>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct KasaResp {
     pub system: Option<System>,
     pub emeter: Option<Emeter>,
