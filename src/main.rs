@@ -21,7 +21,7 @@ fn main() -> Result<()> {
 
     let dev = device::determine_target(args.target_addr)?;
 
-    let mut stream = TcpStream::connect(dev.ip_addr )?;
+    let mut stream = TcpStream::connect(dev.ip_addr.clone() )?;
 
 
     match args.action.as_str() {
@@ -50,12 +50,12 @@ fn main() -> Result<()> {
             child.id, child.alias, child.state
         );
     }
-    let amp = &s[2];
-    let alias_success = kasa_protocol::set_outlet_alias(&mut stream, &amp.id, "amp");
+    //let amp = &s[2];
+    //let alias_success = kasa_protocol::set_outlet_alias(&mut stream, &amp.id, "amp");
 
-    if let Ok(suc) = alias_success {
-        println!("{suc}")
-    }
+    //if let Ok(suc) = alias_success {
+    //    println!("{suc}")
+    //}
 
     let s: Vec<models::KasaChildren> = kasa_protocol::get_children(&mut stream).unwrap();
 

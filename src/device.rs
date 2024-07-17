@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use serde_json::{json, Value};
+use serde_json::{json};
 use std::net::UdpSocket;
 use crate::kasa_protocol::{self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx};
 use crate::models::{KasaChildren, KasaResp, System};
@@ -7,12 +7,9 @@ use crate::validate_ip;
 use std::net::TcpStream;
 
 pub struct Device {
+    //TODO: ip_addr currently holds ip+port, need to actually parse that out
     pub ip_addr: String,
     pub kasa_info: KasaResp,
-    //name?
-    //last seen
-    //
-//
 }
 
 impl Device {
@@ -41,9 +38,8 @@ impl Device {
     
     //make this return the child after the change
     pub fn toggle_relay_by_id(self, idx: usize)  {   
-        let  stream = TcpStream::connect(self.ip_addr.clone() + ":9999");
+        let  stream = TcpStream::connect(self.ip_addr.clone());
         if let Ok(mut strm) = stream {
-             
             let _ = toggle_relay_by_idx(&mut strm, idx);
         }
     }
@@ -111,14 +107,10 @@ pub fn discover() -> Result<Device> {
     while buf[len] != 0 {
         len += 1;
     }
-
-
     let mut recv: Vec<u8> = vec![];
     recv.extend_from_slice(&buf[..len]);
 
-    let decrypted = decrypt(&recv);
-
-    let info = deserialize(&decrypted);
+    let info = deserialize(&decrypt(&recv));
     //println!("{}", info.system.unwrap().get_sysinfo.unwrap().sw_ver);
 
     return Ok(Device::new(ip_addr,info))
