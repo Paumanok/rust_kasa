@@ -1,10 +1,14 @@
-use anyhow::{anyhow, Result};
-use serde_json::{json};
-use std::net::UdpSocket;
-use crate::kasa_protocol::{self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx};
+use crate::kasa_protocol::{
+    self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx,
+};
 use crate::models::{KasaChildren, KasaResp, System};
 use crate::validate_ip;
+use anyhow::{anyhow, Result};
+use serde_json::json;
+use std::io;
 use std::net::TcpStream;
+use std::net::UdpSocket;
+use std::time::Duration;
 
 #[derive(Clone)]
 pub struct Device {
@@ -14,19 +18,14 @@ pub struct Device {
 }
 
 impl Device {
-    
     pub fn new(ip_addr: String, kasa_info: KasaResp) -> Device {
-        Device {
-            ip_addr, 
-            kasa_info,
-        }
+        Device { ip_addr, kasa_info }
     }
 
     pub fn get_children(&self) -> Option<Vec<KasaChildren>> {
         let stream = TcpStream::connect(self.ip_addr.clone());
         if let Ok(mut strm) = stream {
-
-            let  children = match kasa_protocol::get_children(&mut strm){
+            let children = match kasa_protocol::get_children(&mut strm) {
                 Ok(chldrn) => chldrn,
                 Err(_err) => vec![],
             };
@@ -34,18 +33,17 @@ impl Device {
         }
         //let children = self.kasa_info.system.unwrap().get_sysinfo.unwrap().children.clone();
         println!("failed to get children");
-        return None
+        return None;
     }
-    
+
     //make this return the child after the change
-    pub fn toggle_relay_by_id(self, idx: usize)  {   
-        let  stream = TcpStream::connect(self.ip_addr.clone());
+    pub fn toggle_relay_by_id(self, idx: usize) {
+        let stream = TcpStream::connect(self.ip_addr.clone());
         if let Ok(mut strm) = stream {
             let _ = toggle_relay_by_idx(&mut strm, idx);
             println!("toggl'd");
         }
     }
-    
 }
 
 pub fn determine_target(t_addr: String) -> Result<Device> {
@@ -64,7 +62,9 @@ pub fn determine_target(t_addr: String) -> Result<Device> {
                 Ok(si) => Ok(Device {
                     ip_addr: t_addr,
                     kasa_info: KasaResp {
-                        system: Some(System{get_sysinfo: Some(si)}),
+                        system: Some(System {
+                            get_sysinfo: Some(si),
+                        }),
                         emeter: None,
                     },
                 }),
@@ -98,7 +98,7 @@ pub fn discover() -> Result<Device> {
 
     let mut buf = [0; 2048];
 
-    let mut ip_addr : String = String::new();
+    let mut ip_addr: String = String::new();
 
     if let Ok((_n, addr)) = socket.recv_from(&mut buf) {
         //println!("{} bytes response from {:?}", n, addr);
@@ -115,8 +115,45 @@ pub fn discover() -> Result<Device> {
     let info = deserialize(&decrypt(&recv));
     //println!("{}", info.system.unwrap().get_sysinfo.unwrap().sw_ver);
 
-    return Ok(Device::new(ip_addr,info))
+    return Ok(Device::new(ip_addr, info));
 }
 
+pub fn discover_multiple() -> Result<Vec<Device>> {
+    let socket = UdpSocket::bind("0.0.0.0:46477")?;
+    socket.set_broadcast(true)?;
+    let _ = socket.set_read_timeout(Some(Duration::from_millis(500)));
 
+    let cmd = json!({"system": {"get_sysinfo":0}}).to_string();
 
+    let enc_cmd = encrypt(&cmd, false);
+
+    socket.send_to(&enc_cmd, "255.255.255.255:9999")?;
+
+    //let mut ip_addrs: Vec<String> = vec![];
+
+    let mut buf = [0; 2048];
+    let mut devices: Vec<Device> = vec![];
+
+    loop {
+        match socket.recv_from(&mut buf) {
+            Ok((amt, addr)) => {
+                let ip_addr = addr.to_string();
+                let mut recv: Vec<u8> = vec![];
+                recv.extend_from_slice(&buf[..amt]);
+                let info = deserialize(&decrypt(&recv));
+                devices.push(Device::new(ip_addr, info));
+                buf = [0; 2048];
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                println!("Timed out");
+                break;
+            }
+            Err(_) => {
+                println!("something else");
+                break;
+            }
+        }
+    }
+
+    return Ok(devices);
+}

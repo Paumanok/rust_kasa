@@ -1,12 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct NextAction {
     pub r#type: i32,
 }
-#[derive(Serialize, Deserialize)]
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct KasaChildren {
     pub id: String,
     pub state: u8,
@@ -19,16 +17,18 @@ pub struct KasaChildren {
 #[allow(non_snake_case)] //kasa json mixes snake and camel and I don't have control of that
 pub struct SysInfo {
     pub alias: String,
+    #[serde(default)]
     pub child_num: usize,
+    #[serde(default)]
     pub children: Vec<KasaChildren>,
     pub deviceId: String,
     pub err_code: u32,
     pub feature: String,
     pub hwId: String,
     pub hw_ver: String,
-    pub latitude_i: u32,
+    pub latitude_i: i32,
     pub led_off: u8,
-    pub longitude_i: u32,
+    pub longitude_i: i32,
     pub mac: String,
     pub mic_type: String,
     pub model: String,
