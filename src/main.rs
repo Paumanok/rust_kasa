@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use rust_kasa::models::KasaResp;
 use rust_kasa::{device, kasa_protocol, models, validate_ip};
+use std::any::Any;
 use std::net::TcpStream;
 use std::string::String;
 
@@ -10,12 +11,19 @@ struct Cli {
     #[arg(short = 't', long = "target_addr", default_value_t = String::from(""))]
     target_addr: String,
 
+    #[arg(short = 'n', long = "name", default_value_t = String::from(""))]
+    target_name: String,
+
     #[arg(short = 'a', long = "action", default_value_t = String::from(""))]
     action: String,
 }
 
 fn main() -> Result<()> {
-    //let args = Cli::parse();
+    let args = Cli::parse();
+
+    if args.target_name != "" {
+        println!("does this work");
+    }
 
     //let dev = device::determine_target(args.target_addr)?;
 
@@ -71,6 +79,7 @@ fn main() -> Result<()> {
     if let Ok(devices) = device::discover_multiple() {
         for dev in devices {
             println!("ip: {:?}", dev.ip_addr);
+            print!("info {:}\n", dev.sysinfo().unwrap());
         }
     }
 

@@ -3,7 +3,7 @@ use crate::kasa_protocol::{
 };
 use crate::models::{KasaChildren, KasaResp, System};
 use crate::validate_ip;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use serde_json::json;
 use std::io;
 use std::net::TcpStream;
@@ -34,6 +34,10 @@ impl Device {
         //let children = self.kasa_info.system.unwrap().get_sysinfo.unwrap().children.clone();
         println!("failed to get children");
         return None;
+    }
+
+    pub fn sysinfo(&self) -> Option<String> {
+        Some(serde_json::to_string(&self.kasa_info.system.clone()?.get_sysinfo?).unwrap())
     }
 
     //make this return the child after the change
