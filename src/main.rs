@@ -5,6 +5,11 @@ use rust_kasa::{device, kasa_protocol, models, validate_ip};
 use std::any::Any;
 use std::net::TcpStream;
 use std::string::String;
+use std::io::stdout;
+mod app;
+
+use app::App;
+use crossterm::{execute, terminal::{EnterAlternateScreen, LeaveAlternateScreen}};
 
 #[derive(Parser)]
 struct Cli {
@@ -82,6 +87,11 @@ fn main() -> Result<()> {
             print!("info {:}\n", dev.sysinfo().unwrap());
         }
     }
-
-    Ok(())
+   let terminal = ratatui::init();
+    execute!(stdout(), EnterAlternateScreen).expect("failed to enter alternate screen");
+    let app_result = App::default().run(terminal);
+    execute!(stdout(), LeaveAlternateScreen).expect("failed to leave alternate screen");
+    ratatui::restore();
+    app_result 
+    //Ok(())
 }
