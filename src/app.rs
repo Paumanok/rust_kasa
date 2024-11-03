@@ -1,19 +1,78 @@
-use std::time::Duration;
 use anyhow::{anyhow, Error, Result};
 use crossterm::event;
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind},
-    layout::{Constraint, Layout, Rect, Direction},
+    layout::{Constraint, Direction, Layout, Rect},
     style::Color,
     text::{Line, Span},
-    widgets::{Block, Tabs, Widget, BorderType, Borders},
+    widgets::{Block, BorderType, Borders, List, ListState, Paragraph, StatefulWidget, Widget},
     DefaultTerminal, Frame,
 };
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+use std::time::Duration;
+
+use rust_kasa::device;
+
+#[derive(Default, Clone)]
 pub struct App {
     focused: Focus,
     mode: Mode,
+    devices: Devices,
+}
+
+#[derive(Default, Clone)]
+pub struct Devices {
+    devices: Vec<device::Device>,
+    state: ListState,
+}
+
+impl Devices {
+    pub fn new() -> Self {
+        Self {
+            devices: vec![],
+            state: ListState::default(),
+        }
+    }
+
+    //pub fn get_selected(self) -> Option<device::Device> {
+    //    if self.devices.len() < self.idx {
+    //        return Some(self.devices[self.idx].clone());
+    //    } else {
+    //        return None;
+    //    }
+    //}
+
+    pub fn prev(&mut self) {
+        self.state.select_previous();
+    }
+    pub fn next(&mut self) {
+        self.state.select_next();
+    }
+    fn render_device_list(&mut self, area: Rect, buf: &mut Buffer) {
+        let items: Vec<String> = self.devices.iter().map(|i| i.ip_addr.clone()).collect();
+        let list = List::new(items)
+            .block(Block::bordered().title("[D]evices"))
+            .highlight_symbol(">>")
+            .repeat_highlight_symbol(true);
+        StatefulWidget::render(list, area, buf, &mut self.state);
+    }
+
+    fn render_device_info(&mut self, area: Rect, buf: &mut Buffer) {
+        let selected = if let Some(i) = self.state.selected() {
+            let selected_device = &self.devices[i];
+            if let Some(si) = selected_device.sysinfo() {
+                format!("Name: {:}", si.alias)
+            } else {
+                "failed".to_string()
+            }
+        } else {
+            "failed".to_string()
+        };
+
+        let block = Block::new().borders(Borders::ALL).title("[I]nfo");
+
+        let paragraph = Paragraph::new(selected).block(block).render(area, buf);
+    }
 }
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -31,9 +90,14 @@ enum Focus {
 impl App {
     /// Run the app until the user quits.
     pub fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
+        if self.devices.devices.is_empty() {
+            let devs = device::discover_multiple();
+            if let Ok(devices) = devs {
+                self.devices.devices = devices;
+            }
+        }
         while self.is_running() {
-            terminal
-                .draw(|frame| self.draw(frame))?; //this needs an anyhow or color_eyre wrap
+            terminal.draw(|frame| self.draw(frame))?; //this needs an anyhow or color_eyre wrap
             self.handle_events()?;
         }
         Ok(())
@@ -44,7 +108,7 @@ impl App {
     }
 
     /// Draw a single frame of the app.
-    fn draw(&self, frame: &mut Frame) {
+    fn draw(&mut self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
         //if self.mode == Mode::Destroy {
         //    destroy::destroy(frame);
@@ -68,6 +132,7 @@ impl App {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) {
+        //interaction with overall app
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
             KeyCode::Char('d') => self.focused = Focus::Devices,
@@ -75,10 +140,24 @@ impl App {
             KeyCode::Char('c') => self.focused = Focus::Children,
             //KeyCode::Char('h') | KeyCode::Left => self.prev_tab(),
             //KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
-            KeyCode::Char('k') | KeyCode::Up => self.prev(),
-            KeyCode::Char('j') | KeyCode::Down => self.next(),
+            KeyCode::Char('k') => self.prev(),
+            KeyCode::Char('j') => self.next(),
             //KeyCode::Char('d') | KeyCode::Delete => self.destroy(),
             _ => {}
+        };
+        //interaction with focused windows
+        match self.focused {
+            Focus::Devices => match key.code {
+                KeyCode::Up => self.devices.prev(),
+                KeyCode::Down => self.devices.next(),
+                _ => {}
+            },
+            Focus::Children => match key.code {
+                _ => {}
+            },
+            Focus::Stats => match key.code {
+                _ => {}
+            },
         };
     }
 
@@ -97,36 +176,36 @@ impl App {
             Focus::Children => Focus::Devices,
         }
     }
-
-
-    fn render_device_list(&self, area:Rect, buf: &mut Buffer) {
-        //let block = 
-    }
 }
 
 /// Implement Widget for &App rather than for App as we would otherwise have to clone or copy the
 /// entire app state on every frame. For this example, the app state is small enough that it doesn't
 /// matter, but for larger apps this can be a significant performance improvement.
-impl Widget for &App {
+impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![
-            Constraint::Percentage(50),
-            Constraint::Percentage(50)
-            ]).split(area);
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area);
 
         let top_layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![
-            Constraint::Percentage(20),
-            Constraint::Percentage(80)
-            ]).split(layout[0]);
+            .constraints(vec![Constraint::Percentage(20), Constraint::Percentage(80)])
+            .split(layout[0]);
+        self.devices.render_device_list(top_layout[0], buf);
+        self.devices.render_device_info(top_layout[1], buf);
+        //let block = Block::new()
+        //    .borders(Borders::ALL)
+        //    .title(format!("[T]est"))
+        //    .render(top_layout[0], buf);
 
-        let block = Block::new().borders(Borders::ALL).title(format!("[T]est")).render(top_layout[0], buf);
-        let block2 = Block::new().borders(Borders::ALL).title(format!("[T]est2")).render(top_layout[1], buf);
-        let block3 = Block::new().borders(Borders::ALL).title(format!("[T]est3")).render(layout[1], buf);
+        //let block2 = Block::new()
+        //    .borders(Borders::ALL)
+        //    .title(format!("[T]est2"))
+        //    .render(top_layout[1], buf);
+        let block3 = Block::new()
+            .borders(Borders::ALL)
+            .title(format!("[T]est3"))
+            .render(layout[1], buf);
     }
 }
-

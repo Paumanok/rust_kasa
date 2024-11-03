@@ -1,7 +1,7 @@
 use crate::kasa_protocol::{
     self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx,
 };
-use crate::models::{KasaChildren, KasaResp, System};
+use crate::models::{KasaChildren, KasaResp, SysInfo, System};
 use crate::validate_ip;
 use anyhow::{anyhow, Error, Result};
 use serde_json::json;
@@ -36,8 +36,12 @@ impl Device {
         return None;
     }
 
-    pub fn sysinfo(&self) -> Option<String> {
+    pub fn sysinfo_raw(&self) -> Option<String> {
         Some(serde_json::to_string(&self.kasa_info.system.clone()?.get_sysinfo?).unwrap())
+    }
+
+    pub fn sysinfo(&self) -> Option<SysInfo> {
+        Some(self.kasa_info.system.clone()?.get_sysinfo?)
     }
 
     //make this return the child after the change
