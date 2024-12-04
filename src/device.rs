@@ -1,5 +1,5 @@
 use crate::kasa_protocol::{
-    self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx,
+    self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx, toggle_single_relay_outlet,
 };
 use crate::models::{KasaChildren, KasaResp, SysInfo, System};
 use crate::validate_ip;
@@ -43,13 +43,23 @@ impl Device {
     pub fn sysinfo(&self) -> Option<SysInfo> {
         Some(self.kasa_info.system.clone()?.get_sysinfo?)
     }
-
+    
+    pub fn children(&self) -> Option<Vec<KasaChildren>> {
+        Some(self.sysinfo()?.children)
+    }
+    
     //make this return the child after the change
-    pub fn toggle_relay_by_id(self, idx: usize) {
+    pub fn toggle_relay_by_id(&self, idx: usize) {
         let stream = TcpStream::connect(self.ip_addr.clone());
         if let Ok(mut strm) = stream {
             let _ = toggle_relay_by_idx(&mut strm, idx);
             println!("toggl'd");
+        }
+    }
+    
+    pub fn toggle_single_relay(&self) {
+        if let Ok(mut stream)  = TcpStream::connect(self.ip_addr.clone()) {
+            toggle_single_relay_outlet(&mut stream);
         }
     }
 }
@@ -57,7 +67,7 @@ impl Device {
 pub fn determine_target(t_addr: String) -> Result<Device> {
     if t_addr == "" {
         //try discovery
-        if let Ok(kd) = discover() {
+    if let Ok(kd) = discover() {
             return Ok(kd);
         } else {
             return Err(anyhow!("Discovery failed and no target was provided"));
@@ -136,8 +146,6 @@ pub fn discover_multiple() -> Result<Vec<Device>> {
     let enc_cmd = encrypt(&cmd, false);
 
     socket.send_to(&enc_cmd, "255.255.255.255:9999")?;
-
-    //let mut ip_addrs: Vec<String> = vec![];
 
     let mut buf = [0; 2048];
     let mut devices: Vec<Device> = vec![];

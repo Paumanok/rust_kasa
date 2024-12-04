@@ -1,3 +1,5 @@
+use std::u32;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -33,6 +35,10 @@ pub struct SysInfo {
     pub mic_type: String,
     pub model: String,
     pub oemId: String,
+    #[serde(default)]
+    pub on_time: u32,
+    #[serde(default)]
+    pub relay_state: u8,
     pub rssi: i32,
     pub status: String,
     pub sw_ver: String,

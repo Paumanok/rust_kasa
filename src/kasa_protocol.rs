@@ -242,6 +242,38 @@ pub fn toggle_relay_by_idx(stream: &mut TcpStream, idx: usize) -> Result<bool> {
     return Err(anyhow!("Invaid child idx: {}", idx));
 }
 
+
+pub fn toggle_single_relay_outlet(stream: &mut TcpStream) -> Result<bool> {
+    let state = match get_sys_info(stream)?.relay_state {
+        0 => 1,
+        _ => 0,
+    };
+    set_single_relay_outlet(stream, state)
+}
+
+pub fn set_single_relay_outlet(stream: &mut TcpStream, state: u8) -> Result<bool> {
+    let cmd: String = json!({
+        "system": {
+            "set_relay_state" : {
+                "state" : state
+            }
+        }
+    })
+    .to_string();
+
+    send_kasa_cmd(stream, cmd.as_str());
+    let resp: Value = serde_json::from_str(&decrypt(&read_kasa_resp(stream).unwrap()))?;
+
+    let err_resp = resp["system"]["set_relay_state"]["err_code"]
+        .as_i64()
+        .unwrap();
+
+    return Ok(match err_resp {
+        0 => false,
+        _ => true,
+    });
+}
+
 pub fn set_relay_by_child_id(stream: &mut TcpStream, child_id: &str, state: u8) -> Result<bool> {
     let cmd: String = json!({
         "context" : {

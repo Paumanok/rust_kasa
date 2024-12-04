@@ -24,29 +24,30 @@ pub struct App {
 pub struct Devices {
     devices: Vec<device::Device>,
     state: ListState,
+    child_state: ListState,
 }
+
 
 impl Devices {
     pub fn new() -> Self {
         Self {
             devices: vec![],
             state: ListState::default(),
+            child_state: ListState::default(),
         }
     }
-
-    //pub fn get_selected(self) -> Option<device::Device> {
-    //    if self.devices.len() < self.idx {
-    //        return Some(self.devices[self.idx].clone());
-    //    } else {
-    //        return None;
-    //    }
-    //}
 
     pub fn prev(&mut self) {
         self.state.select_previous();
     }
     pub fn next(&mut self) {
         self.state.select_next();
+    }
+    pub fn prev_child(&mut self) {
+        self.child_state.select_previous();
+    }
+    pub fn next_child(&mut self) {
+        self.child_state.select_next();
     }
     fn render_device_list(&mut self, area: Rect, buf: &mut Buffer) {
         let items: Vec<String> = self.devices.iter().map(|i| i.ip_addr.clone()).collect();
@@ -63,7 +64,7 @@ impl Devices {
             if let Some(si) = selected_device.sysinfo() {
                 format!("Name: {:}", si.alias)
             } else {
-                "failed".to_string()
+                "failed1".to_string()
             }
         } else {
             "failed".to_string()
@@ -72,6 +73,43 @@ impl Devices {
         let block = Block::new().borders(Borders::ALL).title("[I]nfo");
 
         let paragraph = Paragraph::new(selected).block(block).render(area, buf);
+    }
+
+    fn render_children(&mut self, area: Rect, buf :&mut Buffer) {
+        let block = Block::new().borders(Borders::ALL).title("[C]hildren");
+        
+        if let Some(p) = self.state.selected() {
+            let selected_device = &self.devices[p];
+            if let Some(si) = selected_device.sysinfo() {
+                if si.child_num > 0 {
+                    if let Some(children) = selected_device.children() {
+                
+                        let items: Vec<String> = children.iter().map(|plug| plug.alias.clone()).collect();
+                        let list = List::new(items)
+                                .block(block)
+                                .highlight_symbol(">>")
+                                .repeat_highlight_symbol(true);
+                            StatefulWidget::render(list, area, buf, &mut self.child_state);
+                            };
+            } else {
+               let paragraph = Paragraph::new(format!("{:} Outlet", si.alias)).block(block).render(area, buf);
+            };
+        };
+        }
+    }
+
+    fn toggle_selected_child_outlet(&mut self) {
+        if let Some(p) = self.state.selected() {
+            let selected_device = &self.devices[p];
+            if let Some(si) = selected_device.sysinfo() {
+                if si.child_num > 0 {
+                    selected_device.toggle_relay_by_id(0);
+                } else {
+                    selected_device.toggle_single_relay();
+
+                }
+            }
+        }
     }
 }
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -94,6 +132,7 @@ impl App {
             let devs = device::discover_multiple();
             if let Ok(devices) = devs {
                 self.devices.devices = devices;
+                self.devices.state.select(Some(0));
             }
         }
         while self.is_running() {
@@ -153,6 +192,9 @@ impl App {
                 _ => {}
             },
             Focus::Children => match key.code {
+                KeyCode::Char(' ') => self.devices.toggle_selected_child_outlet(),
+                KeyCode::Up => self.devices.prev_child(),
+                KeyCode::Down => self.devices.next_child(),
                 _ => {}
             },
             Focus::Stats => match key.code {
@@ -194,6 +236,7 @@ impl Widget for &mut App {
             .split(layout[0]);
         self.devices.render_device_list(top_layout[0], buf);
         self.devices.render_device_info(top_layout[1], buf);
+        self.devices.render_children(layout[1], buf);
         //let block = Block::new()
         //    .borders(Borders::ALL)
         //    .title(format!("[T]est"))
@@ -203,9 +246,9 @@ impl Widget for &mut App {
         //    .borders(Borders::ALL)
         //    .title(format!("[T]est2"))
         //    .render(top_layout[1], buf);
-        let block3 = Block::new()
-            .borders(Borders::ALL)
-            .title(format!("[T]est3"))
-            .render(layout[1], buf);
+        //let block3 = Block::new()
+        //    .borders(Borders::ALL)
+        //    .title(format!("[T]est3"))
+        //    .render(layout[1], buf);
     }
 }
