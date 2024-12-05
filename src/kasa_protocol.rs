@@ -94,51 +94,6 @@ pub fn get_sys_info(stream: &mut TcpStream) -> Result<SysInfo> {
     return Err(anyhow!("failed to get sys_info"));
 }
 
-//pub fn get_all_realtime_mt(stream: &mut TcpStream) -> Option<Vec<Realtime>> {
-//    let c = get_children(stream)?;
-//    //you'd think a field with a plural 'ids' in list brackets would accept a list
-//    // you'd be wrong, so we're calling it multiple times, otherwise it only returns idx0
-//    let ids:Vec<String> = c.into_iter().map(|x| x.id).collect();
-//    let mut rts: Arc<Mutex<Vec<Realtime>>> = Arc::new(Mutex::new(vec![]));
-//    let mut threads = vec![];
-//
-//
-//
-//    for id in ids {
-//        threads.push(thread::spawn( move || -> Option<()> {
-//
-//            let resp: KasaResp = send_and_read( stream,
-//                 &json!({
-//                     "context" : {
-//                         "child_ids" : [ id ]
-//                 },
-//                 "emeter": {
-//                     "get_realtime":null
-//                 },
-//
-//                 }).to_string()
-//             )?;
-//
-//
-//            match rts.lock() {
-//                Ok(rt) => { rt.push(resp.emeter?.get_realtime?);}
-//                _ => (),
-//            }
-//            Some(())
-//
-//        }));
-//
-//    }
-//    for thread in threads {
-//        thread.join();
-//    }
-//
-//    let ret = Arc::into_inner(rts)?.into_inner().ok()?;
-//    return Some(ret);
-//
-//
-//}
-
 pub fn get_all_realtime(stream: &mut TcpStream) -> Result<Vec<Realtime>> {
     let c = get_children(stream)?;
     //you'd think a field with a plural 'ids' in list brackets would accept a list
@@ -165,7 +120,6 @@ pub fn get_all_realtime(stream: &mut TcpStream) -> Result<Vec<Realtime>> {
                 rts.push(rt)
             }
         }
-        //rts.push(resp.emeter?.get_realtime?)
     }
 
     return Ok(rts);
