@@ -1,7 +1,7 @@
 use crate::kasa_protocol::{
     self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx, toggle_single_relay_outlet,
 };
-use crate::models::{KasaChildren, KasaResp, SysInfo, System};
+use crate::models::{KasaChildren, KasaResp, SysInfo, System, Realtime};
 use crate::validate_ip;
 use anyhow::{anyhow, Error, Result};
 use serde_json::json;
@@ -15,11 +15,12 @@ pub struct Device {
     //TODO: ip_addr currently holds ip+port, need to actually parse that out
     pub ip_addr: String,
     pub kasa_info: KasaResp,
+    pub realtime: Vec<Realtime>,
 }
 
 impl Device {
     pub fn new(ip_addr: String, kasa_info: KasaResp) -> Device {
-        Device { ip_addr, kasa_info }
+        Device { ip_addr, kasa_info, realtime: vec![] }
     }
 
     pub fn get_children(&self) -> Option<Vec<KasaChildren>> {
@@ -36,6 +37,22 @@ impl Device {
         return None;
     }
 
+    pub fn get_realtime(&self) -> Option<Vec<Realtime>> {
+        let stream = TcpStream::connect(self.ip_addr.clone());
+
+        if let Ok(mut strm) = stream {
+            let realtime = match kasa_protocol::get_all_realtime(&mut strm) {
+                Ok(rt) => rt,
+                Err(_err) => vec![],
+            };
+            return Some(realtime);
+        }
+        //let children = self.kasa_info.system.unwrap().get_sysinfo.unwrap().children.clone();
+        println!("failed to get realtime");
+        return None;
+
+    }
+
     pub fn sysinfo_raw(&self) -> Option<String> {
         Some(serde_json::to_string(&self.kasa_info.system.clone()?.get_sysinfo?).unwrap())
     }
@@ -47,13 +64,16 @@ impl Device {
     pub fn children(&self) -> Option<Vec<KasaChildren>> {
         Some(self.sysinfo()?.children)
     }
+    pub fn realtime(&self) -> Vec<Realtime> {
+        self.realtime.clone()
+    }
     
     //make this return the child after the change
     pub fn toggle_relay_by_id(&self, idx: usize) {
         let stream = TcpStream::connect(self.ip_addr.clone());
         if let Ok(mut strm) = stream {
             let _ = toggle_relay_by_idx(&mut strm, idx);
-            println!("toggl'd");
+            //println!("toggl'd");
         }
     }
     
@@ -85,6 +105,7 @@ pub fn determine_target(t_addr: String) -> Result<Device> {
                         }),
                         emeter: None,
                     },
+                    realtime: vec![],
                 }),
                 Err(si) => Err(si),
             };
@@ -161,7 +182,7 @@ pub fn discover_multiple() -> Result<Vec<Device>> {
                 buf = [0; 2048];
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                println!("Timed out");
+                //println!("Timed out");
                 break;
             }
             Err(_) => {

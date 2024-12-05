@@ -9,9 +9,10 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, List, ListState, Paragraph, StatefulWidget, Widget},
     DefaultTerminal, Frame,
 };
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use rust_kasa::device;
+use rust_kasa::models::{KasaChildren, Realtime};
 
 #[derive(Default, Clone)]
 pub struct App {
@@ -25,6 +26,7 @@ pub struct Devices {
     devices: Vec<device::Device>,
     state: ListState,
     child_state: ListState,
+    realtime: Vec<Realtime>,
 }
 
 
@@ -34,6 +36,7 @@ impl Devices {
             devices: vec![],
             state: ListState::default(),
             child_state: ListState::default(),
+            realtime: vec![],
         }
     }
 
@@ -83,14 +86,22 @@ impl Devices {
             if let Some(si) = selected_device.sysinfo() {
                 if si.child_num > 0 {
                     if let Some(children) = selected_device.children() {
-                
-                        let items: Vec<String> = children.iter().map(|plug| plug.alias.clone()).collect();
-                        let list = List::new(items)
-                                .block(block)
-                                .highlight_symbol(">>")
-                                .repeat_highlight_symbol(true);
-                            StatefulWidget::render(list, area, buf, &mut self.child_state);
-                            };
+                        if selected_device.realtime().len() > 0 {
+                            let realtime = selected_device.realtime();
+                            let items: Vec<(&KasaChildren, &Realtime)> = children.iter()
+                                .zip(realtime.iter())
+                                .collect();
+
+                            let test1: Vec<String> = items.iter()
+                                .map(|plug| format!("{:} Current {:}", plug.0.alias.clone(), plug.1.current_ma))
+                                .collect();
+                            let list = List::new(test1)
+                                    .block(block)
+                                    .highlight_symbol(">>")
+                                    .repeat_highlight_symbol(true);
+                                StatefulWidget::render(list, area, buf, &mut self.child_state);
+                                };
+                        }
             } else {
                let paragraph = Paragraph::new(format!("{:} Outlet", si.alias)).block(block).render(area, buf);
             };
@@ -98,12 +109,36 @@ impl Devices {
         }
     }
 
+    fn render_bottom_bar(&mut self, area: Rect, buf :&mut Buffer) {
+        let selected = if let Some(i) = self.state.selected() {
+            let selected_device = &self.devices[i];
+            if let Some(si) = selected_device.sysinfo() {
+                match si.child_num {
+                    0 => format!( "Toggle Outlet: {:} [1]", si.alias.clone()),
+                    _ =>  si.children.iter()
+                        .enumerate()
+                        .map(|( i, dev) | format!("[{:}] {:}", i, dev.alias.clone()))
+                        .collect::<Vec<String>>()
+                        .join(" "),
+                }
+            } else {
+                format!("None")
+            }
+        } else {
+            format!("None")
+        };
+
+        let block = Block::new().borders(Borders::ALL);
+
+        let paragraph = Paragraph::new(selected).block(block).render(area, buf);
+    }
+
     fn toggle_selected_child_outlet(&mut self) {
         if let Some(p) = self.state.selected() {
             let selected_device = &self.devices[p];
             if let Some(si) = selected_device.sysinfo() {
                 if si.child_num > 0 {
-                    selected_device.toggle_relay_by_id(0);
+                    selected_device.toggle_relay_by_id(p);
                 } else {
                     selected_device.toggle_single_relay();
 
@@ -135,11 +170,29 @@ impl App {
                 self.devices.state.select(Some(0));
             }
         }
+        self.update_realtime();
+        let mut instant = Instant::now();
         while self.is_running() {
             terminal.draw(|frame| self.draw(frame))?; //this needs an anyhow or color_eyre wrap
             self.handle_events()?;
+
+            if Instant::now() - instant > Duration::from_secs(5) {
+                instant = Instant::now();
+                self.update_realtime();
+            }
+            //make time stamp and keep track of elipsed time, if x time elapses, update realtime
         }
         Ok(())
+    }
+
+    fn update_realtime(&mut self) {
+
+        if let Some(p) = self.devices.state.selected() {
+            let selected_device = &mut self.devices.devices[p];
+            if let Some(rt) = selected_device.get_realtime() {
+                selected_device.realtime = rt;
+            }
+        };
     }
 
     fn is_running(&self) -> bool {
@@ -169,6 +222,8 @@ impl App {
         }
         Ok(())
     }
+
+    
 
     fn handle_key_press(&mut self, key: KeyEvent) {
         //interaction with overall app
@@ -227,7 +282,7 @@ impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .constraints(vec![Constraint::Percentage(45), Constraint::Percentage(45), Constraint::Percentage(10)])
             .split(area);
 
         let top_layout = Layout::default()
@@ -237,6 +292,7 @@ impl Widget for &mut App {
         self.devices.render_device_list(top_layout[0], buf);
         self.devices.render_device_info(top_layout[1], buf);
         self.devices.render_children(layout[1], buf);
+        self.devices.render_bottom_bar(layout[2], buf);
         //let block = Block::new()
         //    .borders(Borders::ALL)
         //    .title(format!("[T]est"))
