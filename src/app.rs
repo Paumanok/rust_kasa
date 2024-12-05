@@ -29,7 +29,6 @@ pub struct Devices {
     realtime: Vec<Realtime>,
 }
 
-
 impl Devices {
     pub fn new() -> Self {
         Self {
@@ -78,9 +77,9 @@ impl Devices {
         let paragraph = Paragraph::new(selected).block(block).render(area, buf);
     }
 
-    fn render_children(&mut self, area: Rect, buf :&mut Buffer) {
+    fn render_children(&mut self, area: Rect, buf: &mut Buffer) {
         let block = Block::new().borders(Borders::ALL).title("[C]hildren");
-        
+
         if let Some(p) = self.state.selected() {
             let selected_device = &self.devices[p];
             if let Some(si) = selected_device.sysinfo() {
@@ -88,36 +87,46 @@ impl Devices {
                     if let Some(children) = selected_device.children() {
                         if selected_device.realtime().len() > 0 {
                             let realtime = selected_device.realtime();
-                            let items: Vec<(&KasaChildren, &Realtime)> = children.iter()
-                                .zip(realtime.iter())
-                                .collect();
+                            let items: Vec<(&KasaChildren, &Realtime)> =
+                                children.iter().zip(realtime.iter()).collect();
 
-                            let test1: Vec<String> = items.iter()
-                                .map(|plug| format!("{:} Current {:}", plug.0.alias.clone(), plug.1.current_ma))
+                            let test1: Vec<String> = items
+                                .iter()
+                                .map(|plug| {
+                                    format!(
+                                        "{:} Current {:}",
+                                        plug.0.alias.clone(),
+                                        plug.1.current_ma
+                                    )
+                                })
                                 .collect();
                             let list = List::new(test1)
-                                    .block(block)
-                                    .highlight_symbol(">>")
-                                    .repeat_highlight_symbol(true);
-                                StatefulWidget::render(list, area, buf, &mut self.child_state);
-                                };
-                        }
-            } else {
-               let paragraph = Paragraph::new(format!("{:} Outlet", si.alias)).block(block).render(area, buf);
+                                .block(block)
+                                .highlight_symbol(">>")
+                                .repeat_highlight_symbol(true);
+                            StatefulWidget::render(list, area, buf, &mut self.child_state);
+                        };
+                    }
+                } else {
+                    let paragraph = Paragraph::new(format!("{:} Outlet", si.alias))
+                        .block(block)
+                        .render(area, buf);
+                };
             };
-        };
         }
     }
 
-    fn render_bottom_bar(&mut self, area: Rect, buf :&mut Buffer) {
+    fn render_bottom_bar(&mut self, area: Rect, buf: &mut Buffer) {
         let selected = if let Some(i) = self.state.selected() {
             let selected_device = &self.devices[i];
             if let Some(si) = selected_device.sysinfo() {
                 match si.child_num {
-                    0 => format!( "Toggle Outlet: {:} [1]", si.alias.clone()),
-                    _ =>  si.children.iter()
+                    0 => format!("Toggle Outlet: {:} [1]", si.alias.clone()),
+                    _ => si
+                        .children
+                        .iter()
                         .enumerate()
-                        .map(|( i, dev) | format!("[{:}] {:}", i, dev.alias.clone()))
+                        .map(|(i, dev)| format!("[{:}] {:}", i, dev.alias.clone()))
                         .collect::<Vec<String>>()
                         .join(" "),
                 }
@@ -141,7 +150,6 @@ impl Devices {
                     selected_device.toggle_relay_by_id(p);
                 } else {
                     selected_device.toggle_single_relay();
-
                 }
             }
         }
@@ -186,7 +194,6 @@ impl App {
     }
 
     fn update_realtime(&mut self) {
-
         if let Some(p) = self.devices.state.selected() {
             let selected_device = &mut self.devices.devices[p];
             if let Some(rt) = selected_device.get_realtime() {
@@ -202,9 +209,6 @@ impl App {
     /// Draw a single frame of the app.
     fn draw(&mut self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
-        //if self.mode == Mode::Destroy {
-        //    destroy::destroy(frame);
-        //}
     }
 
     /// Handle events from the terminal.
@@ -222,8 +226,6 @@ impl App {
         }
         Ok(())
     }
-
-    
 
     fn handle_key_press(&mut self, key: KeyEvent) {
         //interaction with overall app
@@ -282,7 +284,11 @@ impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(45), Constraint::Percentage(45), Constraint::Percentage(10)])
+            .constraints(vec![
+                Constraint::Percentage(45),
+                Constraint::Percentage(45),
+                Constraint::Percentage(10),
+            ])
             .split(area);
 
         let top_layout = Layout::default()
@@ -293,18 +299,5 @@ impl Widget for &mut App {
         self.devices.render_device_info(top_layout[1], buf);
         self.devices.render_children(layout[1], buf);
         self.devices.render_bottom_bar(layout[2], buf);
-        //let block = Block::new()
-        //    .borders(Borders::ALL)
-        //    .title(format!("[T]est"))
-        //    .render(top_layout[0], buf);
-
-        //let block2 = Block::new()
-        //    .borders(Borders::ALL)
-        //    .title(format!("[T]est2"))
-        //    .render(top_layout[1], buf);
-        //let block3 = Block::new()
-        //    .borders(Borders::ALL)
-        //    .title(format!("[T]est3"))
-        //    .render(layout[1], buf);
     }
 }

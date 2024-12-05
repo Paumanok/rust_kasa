@@ -242,7 +242,6 @@ pub fn toggle_relay_by_idx(stream: &mut TcpStream, idx: usize) -> Result<bool> {
     return Err(anyhow!("Invaid child idx: {}", idx));
 }
 
-
 pub fn toggle_single_relay_outlet(stream: &mut TcpStream) -> Result<bool> {
     let state = match get_sys_info(stream)?.relay_state {
         0 => 1,

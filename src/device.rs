@@ -1,7 +1,8 @@
 use crate::kasa_protocol::{
-    self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx, toggle_single_relay_outlet,
+    self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx,
+    toggle_single_relay_outlet,
 };
-use crate::models::{KasaChildren, KasaResp, SysInfo, System, Realtime};
+use crate::models::{KasaChildren, KasaResp, Realtime, SysInfo, System};
 use crate::validate_ip;
 use anyhow::{anyhow, Error, Result};
 use serde_json::json;
@@ -20,7 +21,11 @@ pub struct Device {
 
 impl Device {
     pub fn new(ip_addr: String, kasa_info: KasaResp) -> Device {
-        Device { ip_addr, kasa_info, realtime: vec![] }
+        Device {
+            ip_addr,
+            kasa_info,
+            realtime: vec![],
+        }
     }
 
     pub fn get_children(&self) -> Option<Vec<KasaChildren>> {
@@ -50,7 +55,6 @@ impl Device {
         //let children = self.kasa_info.system.unwrap().get_sysinfo.unwrap().children.clone();
         println!("failed to get realtime");
         return None;
-
     }
 
     pub fn sysinfo_raw(&self) -> Option<String> {
@@ -60,14 +64,14 @@ impl Device {
     pub fn sysinfo(&self) -> Option<SysInfo> {
         Some(self.kasa_info.system.clone()?.get_sysinfo?)
     }
-    
+
     pub fn children(&self) -> Option<Vec<KasaChildren>> {
         Some(self.sysinfo()?.children)
     }
     pub fn realtime(&self) -> Vec<Realtime> {
         self.realtime.clone()
     }
-    
+
     //make this return the child after the change
     pub fn toggle_relay_by_id(&self, idx: usize) {
         let stream = TcpStream::connect(self.ip_addr.clone());
@@ -76,9 +80,9 @@ impl Device {
             //println!("toggl'd");
         }
     }
-    
+
     pub fn toggle_single_relay(&self) {
-        if let Ok(mut stream)  = TcpStream::connect(self.ip_addr.clone()) {
+        if let Ok(mut stream) = TcpStream::connect(self.ip_addr.clone()) {
             toggle_single_relay_outlet(&mut stream);
         }
     }
@@ -87,7 +91,7 @@ impl Device {
 pub fn determine_target(t_addr: String) -> Result<Device> {
     if t_addr == "" {
         //try discovery
-    if let Ok(kd) = discover() {
+        if let Ok(kd) = discover() {
             return Ok(kd);
         } else {
             return Err(anyhow!("Discovery failed and no target was provided"));
