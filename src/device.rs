@@ -4,7 +4,7 @@ use crate::kasa_protocol::{
 };
 use crate::models::{KasaChildren, KasaResp, Realtime, SysInfo, System};
 use crate::validate_ip;
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Result};
 use serde_json::json;
 use std::io;
 use std::net::TcpStream;
@@ -13,7 +13,6 @@ use std::time::Duration;
 
 #[derive(Clone)]
 pub struct Device {
-    //TODO: ip_addr currently holds ip+port, need to actually parse that out
     pub ip_addr: String,
     pub kasa_info: KasaResp,
     pub realtime: Vec<Realtime>,
@@ -74,10 +73,11 @@ impl Device {
 
     //make this return the child after the change
     pub fn toggle_relay_by_id(&self, idx: usize) {
-        let stream = TcpStream::connect(self.ip_addr.clone());
+        println!("ip:{:}, idx: {:}", self.ip_addr, idx);
+        let stream = TcpStream::connect(format!( "{:}:9999",self.ip_addr.clone()));
         if let Ok(mut strm) = stream {
             let _ = toggle_relay_by_idx(&mut strm, idx);
-            //println!("toggl'd");
+            println!("toggl'd");
         }
     }
 
@@ -200,10 +200,6 @@ pub fn discover_multiple() -> Result<Vec<Device>> {
 }
 
 pub fn discover_multiple_ip() -> Result<Vec<String>> {
-    //match discover_multiple() {
-    //    Ok(d) => d.iter().map(|dev| dev.ip_addr.clone()).collect(),
-    //    _ => vec![],
-    //}
     let socket = UdpSocket::bind("0.0.0.0:46477")?;
     socket.set_broadcast(true)?;
     let _ = socket.set_read_timeout(Some(Duration::from_millis(500)));
@@ -222,11 +218,6 @@ pub fn discover_multiple_ip() -> Result<Vec<String>> {
             Ok((_amt, addr)) => {
                 
                 let ip_addr = addr.ip().to_string();
-                //let mut recv: Vec<u8> = vec![];
-                //recv.extend_from_slice(&buf[..amt]);
-                //let info = deserialize(&decrypt(&recv));
-                //devices.push(Device::new(ip_addr, info));
-                //buf = [0; 2048];
                 devices.push(ip_addr);
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
