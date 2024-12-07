@@ -150,10 +150,15 @@ pub fn get_realtime_by_id(stream: &mut TcpStream, id: &String) -> Result<Realtim
 }
 
 pub fn get_realtime(stream: &mut TcpStream) -> Result<Realtime> {
-    let cmd = r#"{"emeter":{"get_realtime":null}}"#;
-    send_kasa_cmd(stream, &cmd);
-    let resp = read_kasa_resp(stream)?;
-    let resp: KasaResp = deserialize(&decrypt(&resp));
+    let resp: KasaResp = send_and_read(
+        stream,
+        &json!({
+        "emeter": {
+            "get_realtime":null
+            },
+        })
+        .to_string(),
+    )?;
     if let Some(emeter) = resp.emeter {
         if let Some(rt) = emeter.get_realtime {
             return Ok(rt);
