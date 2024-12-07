@@ -6,13 +6,13 @@ use std::any::Any;
 use std::io::stdout;
 use std::net::TcpStream;
 use std::string::String;
-mod app;
+//mod app;
 
-use app::App;
-use crossterm::{
-    execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
-};
+//use app::App;
+//use crossterm::{
+//    execute,
+//    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+//};
 
 #[derive(Parser)]
 struct Cli {
@@ -90,11 +90,11 @@ fn main() -> Result<()> {
     //        print!("info {:}\n", dev.sysinfo().unwrap());
     //    }
     //}
-    let terminal = ratatui::init();
-    execute!(stdout(), EnterAlternateScreen).expect("failed to enter alternate screen");
-    let app_result = App::default().run(terminal);
-    execute!(stdout(), LeaveAlternateScreen).expect("failed to leave alternate screen");
-    ratatui::restore();
-    app_result
-    //Ok(())
+   // let terminal = ratatui::init();
+   // execute!(stdout(), EnterAlternateScreen).expect("failed to enter alternate screen");
+   // let app_result = App::default().run(terminal);
+   // execute!(stdout(), LeaveAlternateScreen).expect("failed to leave alternate screen");
+   // ratatui::restore();
+   // app_result
+    Ok(())
 }

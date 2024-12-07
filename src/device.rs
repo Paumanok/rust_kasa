@@ -198,3 +198,47 @@ pub fn discover_multiple() -> Result<Vec<Device>> {
 
     return Ok(devices);
 }
+
+pub fn discover_multiple_ip() -> Result<Vec<String>> {
+    //match discover_multiple() {
+    //    Ok(d) => d.iter().map(|dev| dev.ip_addr.clone()).collect(),
+    //    _ => vec![],
+    //}
+    let socket = UdpSocket::bind("0.0.0.0:46477")?;
+    socket.set_broadcast(true)?;
+    let _ = socket.set_read_timeout(Some(Duration::from_millis(500)));
+
+    let cmd = json!({"system": {"get_sysinfo":0}}).to_string();
+
+    let enc_cmd = encrypt(&cmd, false);
+
+    socket.send_to(&enc_cmd, "255.255.255.255:9999")?;
+
+    let mut buf = [0; 20];
+    let mut devices: Vec<String> = vec![];
+
+    loop {
+        match socket.recv_from(&mut buf) {
+            Ok((_amt, addr)) => {
+                
+                let ip_addr = addr.ip().to_string();
+                //let mut recv: Vec<u8> = vec![];
+                //recv.extend_from_slice(&buf[..amt]);
+                //let info = deserialize(&decrypt(&recv));
+                //devices.push(Device::new(ip_addr, info));
+                //buf = [0; 2048];
+                devices.push(ip_addr);
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                //println!("Timed out");
+                break;
+            }
+            Err(_) => {
+                println!("something else");
+                break;
+            }
+        }
+    }
+
+    return Ok(devices);
+}
