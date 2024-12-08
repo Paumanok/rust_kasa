@@ -67,6 +67,17 @@ impl Device {
     pub fn children(&self) -> Option<Vec<KasaChildren>> {
         Some(self.sysinfo()?.children)
     }
+    pub fn num_children(&self) -> Option<usize> {
+        Some(self.sysinfo()?.child_num)
+    }
+    pub fn has_children(&self) -> bool {
+        if let Some(nc) = self.num_children() {
+            if nc > 0 {
+                return true;
+            }
+        }
+        return false;
+    }
     pub fn realtime(&self) -> Vec<Realtime> {
         self.realtime.clone()
     }
@@ -90,12 +101,13 @@ impl Device {
 
 pub fn determine_target(t_addr: String) -> Result<Device> {
     if t_addr == "" {
+        return Err(anyhow!("Discovery failed and no target was provided"));
         //try discovery
-        if let Ok(kd) = discover() {
-            return Ok(kd);
-        } else {
-            return Err(anyhow!("Discovery failed and no target was provided"));
-        }
+        //if let Ok(kd) = discover() {
+        //    return Ok(kd);
+        //} else {
+        //    return Err(anyhow!("Discovery failed and no target was provided"));
+        //}
     } else {
         if validate_ip(&t_addr) {
             println!("good ip");
@@ -123,45 +135,45 @@ pub fn determine_target(t_addr: String) -> Result<Device> {
 
 //this will only discover one
 //will need to be revisited
-pub fn discover() -> Result<Device> {
-    let socket = UdpSocket::bind("0.0.0.0:46477")?;
-    socket.set_broadcast(true)?;
+//pub fn discover() -> Result<Device> {
+//    let socket = UdpSocket::bind("0.0.0.0:46477")?;
+//    socket.set_broadcast(true)?;
+//
+//    let cmd = json!({"system": {"get_sysinfo":0}}).to_string();
+//    //this is for the newer devices, which I lack
+//    //let cmd2 = "020000010000000000000000463cb5d3";
+//
+//    let enc_cmd = encrypt(&cmd, false);
+//    //println!("{:?}", enc_cmd);
+//    //let enc_cmd: &[u8] = &enc_cmd;
+//
+//    socket.send_to(&enc_cmd, "255.255.255.255:9999")?;
+//
+//    //println!("sent");
+//
+//    let mut buf = [0; 2048];
+//
+//    let mut ip_addr: String = String::new();
+//
+//    if let Ok((_n, addr)) = socket.recv_from(&mut buf) {
+//        //println!("{} bytes response from {:?}", n, addr);
+//        ip_addr = addr.to_string();
+//    }
+//
+//    let mut len: usize = 0;
+//    while buf[len] != 0 {
+//        len += 1;
+//    }
+//    let mut recv: Vec<u8> = vec![];
+//    recv.extend_from_slice(&buf[..len]);
+//
+//    let info = deserialize(&decrypt(&recv));
+//    //println!("{}", info.system.unwrap().get_sysinfo.unwrap().sw_ver);
+//
+//    return Ok(Device::new(ip_addr, info));
+//}
 
-    let cmd = json!({"system": {"get_sysinfo":0}}).to_string();
-    //this is for the newer devices, which I lack
-    //let cmd2 = "020000010000000000000000463cb5d3";
-
-    let enc_cmd = encrypt(&cmd, false);
-    //println!("{:?}", enc_cmd);
-    //let enc_cmd: &[u8] = &enc_cmd;
-
-    socket.send_to(&enc_cmd, "255.255.255.255:9999")?;
-
-    //println!("sent");
-
-    let mut buf = [0; 2048];
-
-    let mut ip_addr: String = String::new();
-
-    if let Ok((_n, addr)) = socket.recv_from(&mut buf) {
-        //println!("{} bytes response from {:?}", n, addr);
-        ip_addr = addr.to_string();
-    }
-
-    let mut len: usize = 0;
-    while buf[len] != 0 {
-        len += 1;
-    }
-    let mut recv: Vec<u8> = vec![];
-    recv.extend_from_slice(&buf[..len]);
-
-    let info = deserialize(&decrypt(&recv));
-    //println!("{}", info.system.unwrap().get_sysinfo.unwrap().sw_ver);
-
-    return Ok(Device::new(ip_addr, info));
-}
-
-pub fn discover_multiple() -> Result<Vec<Device>> {
+pub fn discover() -> Result<Vec<Device>> {
     let socket = UdpSocket::bind("0.0.0.0:46477")?;
     socket.set_broadcast(true)?;
     let _ = socket.set_read_timeout(Some(Duration::from_millis(500)));
@@ -199,7 +211,10 @@ pub fn discover_multiple() -> Result<Vec<Device>> {
     return Ok(devices);
 }
 
-pub fn discover_multiple_ip() -> Result<Vec<String>> {
+//Lower overhead version for embedded usecases.
+//Won't allocate big buffers for full sysinfo, just throw
+//it away and take the target ip
+pub fn discover_ip() -> Result<Vec<String>> {
     let socket = UdpSocket::bind("0.0.0.0:46477")?;
     socket.set_broadcast(true)?;
     let _ = socket.set_read_timeout(Some(Duration::from_millis(500)));
