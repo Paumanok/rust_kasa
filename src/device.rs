@@ -1,6 +1,5 @@
 use crate::kasa_protocol::{
-    self, decrypt, deserialize, encrypt, get_sys_info, toggle_relay_by_idx,
-    toggle_single_relay_outlet,
+    self, decrypt, deserialize, encrypt, get_sys_info, set_relay_by_child_id, set_single_relay_outlet, toggle_relay_by_idx, toggle_single_relay_outlet, set_relay_by_idx
 };
 use crate::models::{KasaChildren, KasaResp, Realtime, SysInfo, System};
 use crate::validate_ip;
@@ -82,19 +81,41 @@ impl Device {
         self.realtime.clone()
     }
 
-    //make this return the child after the change
     pub fn toggle_relay_by_id(&self, idx: usize) {
         println!("ip:{:}, idx: {:}", self.ip_addr, idx);
-        let stream = TcpStream::connect(format!( "{:}:9999",self.ip_addr.clone()));
+        let stream = TcpStream::connect(self.ip_addr.clone());
         if let Ok(mut strm) = stream {
             let _ = toggle_relay_by_idx(&mut strm, idx);
             println!("toggl'd");
         }
     }
+    //similar to kasa protocol but wont retrieve a new sysinfo first
+    pub fn set_child_relay_by_idx(&self, idx: usize, state: u8) { 
+        println!("{:}", state);
+        if let Ok(mut stream) = TcpStream::connect(self.ip_addr.clone()) {
+            if let Some(children) = self.children() {
+                if idx < children.len() {
+                    let child_id = &children[idx].id;
+                    println!("{:}", child_id);
+                    let _result = set_relay_by_idx(&mut stream, idx, state);
+                    if let Ok(res) = _result {
+                        println!("{:}", res);
+                    }
+                    println!("toggling");
+                }
+            }
+        }
+    }
+
+    pub fn set_single_relay(&self, state: u8) {
+        if let Ok(mut stream) = TcpStream::connect(self.ip_addr.clone()) {
+            let _ = set_single_relay_outlet(&mut stream, state);
+        }
+    }
 
     pub fn toggle_single_relay(&self) {
         if let Ok(mut stream) = TcpStream::connect(self.ip_addr.clone()) {
-            toggle_single_relay_outlet(&mut stream);
+            let _ = toggle_single_relay_outlet(&mut stream);
         }
     }
 }

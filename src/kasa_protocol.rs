@@ -201,11 +201,22 @@ pub fn toggle_relay_by_idx(stream: &mut TcpStream, idx: usize) -> Result<bool> {
     return Err(anyhow!("Invaid child idx: {}", idx));
 }
 
+pub fn set_relay_by_idx(stream: &mut TcpStream, idx: usize, state: u8) -> Result<bool> {
+    let children = get_children(stream).unwrap();
+    if idx < children.len() {
+        let child_id = &children[idx].id;
+        let result = set_relay_by_child_id(stream, &child_id, state);
+        return result;
+    }
+    return Err(anyhow!("Invaid child idx: {}", idx));
+}
+
 pub fn toggle_single_relay_outlet(stream: &mut TcpStream) -> Result<bool> {
     let state = match get_sys_info(stream)?.relay_state {
         0 => 1,
         _ => 0,
     };
+    println!("toggl");
     set_single_relay_outlet(stream, state)
 }
 
